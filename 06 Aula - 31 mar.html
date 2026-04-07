@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Normalização de Banco de Dados</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d0f14;
+      --surface: #141720;
+      --surface2: #1c2030;
+      --border: #2a3050;
+      --accent: #4fffb0;
+      --accent2: #ff6b6b;
+      --accent3: #4da6ff;
+      --accent4: #ffd166;
+      --text: #e8eaf6;
+      --muted: #7888aa;
+      --pk: #ffd166;
+      --fk: #ff9f43;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .slideshow {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: none;
+      flex-direction: column;
+      padding: 44px 64px;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .slide.active {
+      display: flex;
+      opacity: 1;
+    }
+
+    .slide::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(74, 255, 176, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(74, 255, 176, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .slide-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .slide-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+      background: rgba(79, 255, 176, 0.1);
+      border: 1px solid rgba(79, 255, 176, 0.3);
+      padding: 4px 12px;
+      border-radius: 4px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .slide-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    h1 {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -1px;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    h2 {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 20px;
+    }
+
+    h2 .highlight {
+      color: var(--accent);
+    }
+
+    p.lead {
+      font-size: 18px;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 640px;
+    }
+
+    /* DB TABLES */
+    .db-table {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .db-table.problem {
+      border-color: rgba(255, 107, 107, 0.5);
+    }
+
+    .db-table.ok {
+      border-color: rgba(79, 255, 176, 0.4);
+    }
+
+    .db-table.new {
+      border-color: rgba(77, 166, 255, 0.5);
+    }
+
+    .db-table-header {
+      background: var(--surface2);
+      padding: 8px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent3);
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .db-table.problem .db-table-header {
+      color: var(--accent2);
+    }
+
+    .db-table.ok .db-table-header {
+      color: var(--accent);
+    }
+
+    .db-table.new .db-table-header {
+      color: var(--accent3);
+    }
+
+    .db-table ul {
+      list-style: none;
+      padding: 5px 0;
+    }
+
+    .db-table ul li {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 4px 14px;
+      color: var(--text);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .db-table ul li:last-child {
+      border-bottom: none;
+    }
+
+    .db-table ul li.warn {
+      color: var(--accent2);
+    }
+
+    .badge {
+      font-size: 8px;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .badge.pk {
+      background: rgba(255, 209, 102, 0.15);
+      color: var(--pk);
+      border: 1px solid rgba(255, 209, 102, 0.3);
+    }
+
+    .badge.fk {
+      background: rgba(255, 159, 67, 0.15);
+      color: var(--fk);
+      border: 1px solid rgba(255, 159, 67, 0.3);
+    }
+
+    /* CARDS */
+    .cards-row {
+      display: flex;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .card.blue::after {
+      background: var(--accent3);
+    }
+
+    .card.green::after {
+      background: var(--accent);
+    }
+
+    .card.red::after {
+      background: var(--accent2);
+    }
+
+    .card.yellow::after {
+      background: var(--accent4);
+    }
+
+    .card-icon {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .card p,
+    .card li {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .card ul {
+      padding-left: 16px;
+    }
+
+    .card ul li {
+      margin-bottom: 3px;
+    }
+
+    /* FN BADGE */
+    .fn-badge {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    .fn-badge.first {
+      background: rgba(77, 166, 255, 0.15);
+      color: var(--accent3);
+      border: 1px solid rgba(77, 166, 255, 0.3);
+    }
+
+    .fn-badge.second {
+      background: rgba(79, 255, 176, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(79, 255, 176, 0.3);
+    }
+
+    .fn-badge.third {
+      background: rgba(255, 209, 102, 0.15);
+      color: var(--pk);
+      border: 1px solid rgba(255, 209, 102, 0.3);
+    }
+
+    /* PROBLEM ROW */
+    .problem-row {
+      background: rgba(255, 107, 107, 0.07);
+      border-left: 3px solid var(--accent2);
+      padding: 9px 12px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 9px;
+    }
+
+    .problem-row .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      color: var(--accent2);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+
+    .problem-row p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .problem-row span {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* DEP ARROWS */
+    .dep-box {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      gap: 0;
+    }
+
+    .dep-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text);
+    }
+
+    .dep-item.key {
+      border-color: var(--pk);
+      color: var(--pk);
+    }
+
+    .dep-item.result {
+      border-color: var(--accent3);
+      color: var(--accent3);
+    }
+
+    .dep-item.bad {
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+
+    .dep-arrow {
+      font-size: 14px;
+      color: var(--muted);
+      padding: 0 8px;
+    }
+
+    /* TWO COL */
+    .two-col {
+      display: flex;
+      gap: 32px;
+      flex: 1;
+    }
+
+    .col {
+      flex: 1;
+    }
+
+    /* SOLUTION NOTE */
+    .solution-note {
+      background: rgba(79, 255, 176, 0.06);
+      border: 1px solid rgba(79, 255, 176, 0.2);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.6;
+    }
+
+    /* SUMMARY TABLE */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+    }
+
+    .summary-table th {
+      background: var(--surface2);
+      padding: 9px 14px;
+      text-align: left;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .summary-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      vertical-align: top;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .summary-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tag-normal {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 1px;
+    }
+
+    .tag-1fn {
+      background: rgba(77, 166, 255, 0.15);
+      color: var(--accent3);
+    }
+
+    .tag-2fn {
+      background: rgba(79, 255, 176, 0.15);
+      color: var(--accent);
+    }
+
+    .tag-3fn {
+      background: rgba(255, 209, 102, 0.15);
+      color: var(--pk);
+    }
+
+    .big-num {
+      font-size: 120px;
+      font-weight: 800;
+      color: rgba(79, 255, 176, 0.06);
+      position: absolute;
+      right: 60px;
+      top: 50%;
+      transform: translateY(-50%);
+      line-height: 1;
+      pointer-events: none;
+      letter-spacing: -6px;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(20, 23, 32, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 8px 20px;
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    nav button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 18px;
+      cursor: pointer;
+      transition: color 0.2s;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    nav button:hover {
+      color: var(--accent);
+      background: rgba(79, 255, 176, 0.08);
+    }
+
+    .dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .dot.active {
+      background: var(--accent);
+      width: 20px;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="slideshow">
+
+    <!-- ===== SLIDE 1: CAPA ===== -->
+    <div class="slide active" id="slide-1">
+      <div class="slide-header">
+        <div class="slide-tag">Banco de Dados</div>
+        <div class="slide-num">01 / 08</div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;">
+        <div>
+          <h1>Normalização de<br><span>Banco de Dados</span></h1>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:10px;">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted)">1FN</span>
+            <span style="color:var(--border)">—</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted)">2FN</span>
+            <span style="color:var(--border)">—</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted)">3FN</span>
+          </div>
+        </div>
+        <p class="lead">Técnicas para organizar estruturas relacionais, eliminar redundâncias e garantir a integridade
+          dos dados.</p>
+        <div style="display:flex;gap:12px;margin-top:4px;">
+          <div
+            style="background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.2);border-radius:6px;padding:10px 18px;">
+            <div
+              style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">
+              ANTES</div>
+            <div style="font-size:13px;font-weight:600;color:var(--accent2)">3 tabelas</div>
+          </div>
+          <div
+            style="background:rgba(79,255,176,0.08);border:1px solid rgba(79,255,176,0.2);border-radius:6px;padding:10px 18px;">
+            <div
+              style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">
+              DEPOIS</div>
+            <div style="font-size:13px;font-weight:600;color:var(--accent)">11 tabelas normalizadas</div>
+          </div>
+          <div
+            style="background:rgba(77,166,255,0.08);border:1px solid rgba(77,166,255,0.2);border-radius:6px;padding:10px 18px;">
+            <div
+              style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px;">
+              BANCO EXEMPLO</div>
+            <div style="font-size:13px;font-weight:600;">Sistema de Biblioteca</div>
+          </div>
+        </div>
+      </div>
+      <div class="big-num">N</div>
+    </div>
+
+    <!-- ===== SLIDE 2: CONCEITO ===== -->
+    <div class="slide" id="slide-2">
+      <div class="slide-header">
+        <div class="slide-tag">Conceito</div>
+        <div class="slide-num">02 / 08</div>
+      </div>
+      <h2>O que é <span class="highlight">Normalização?</span></h2>
+      <div class="cards-row">
+        <div class="card blue">
+          <div class="card-icon">📐</div>
+          <h3>Definição</h3>
+          <p>Processo de organizar atributos e relações de um banco de dados para reduzir <strong>redundâncias</strong>
+            e melhorar a <strong>integridade dos dados</strong>.</p>
+        </div>
+        <div class="card green">
+          <div class="card-icon">🎯</div>
+          <h3>Objetivos</h3>
+          <ul>
+            <li>Eliminar dados duplicados</li>
+            <li>Garantir dependências lógicas</li>
+            <li>Facilitar manutenção</li>
+            <li>Prevenir anomalias</li>
+          </ul>
+        </div>
+        <div class="card red">
+          <div class="card-icon">⚠️</div>
+          <h3>Anomalias evitadas</h3>
+          <ul>
+            <li><strong>Inserção:</strong> não conseguir inserir sem outro dado</li>
+            <li><strong>Exclusão:</strong> apagar e perder outra informação</li>
+            <li><strong>Atualização:</strong> ter de corrigir em N lugares</li>
+          </ul>
+        </div>
+        <div class="card yellow">
+          <div class="card-icon">🏛️</div>
+          <h3>Formas Normais</h3>
+          <ul>
+            <li>1FN — Atomicidade</li>
+            <li>2FN — Dep. total na PK</li>
+            <li>3FN — Sem dep. transitiva</li>
+            <li>FNBC, 4FN, 5FN…</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SLIDE 3: MODELO INICIAL ===== -->
+    <div class="slide" id="slide-3">
+      <div class="slide-header">
+        <div class="slide-tag">Modelo Inicial</div>
+        <div class="slide-num">03 / 08</div>
+      </div>
+      <h2>Modelo <span class="highlight">Antes da Normalização</span></h2>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px;font-family:'JetBrains Mono',monospace;">Sistema de
+        Biblioteca — 3 tabelas originais com problemas identificados</p>
+      <div style="display:flex;gap:16px;">
+        <div class="db-table problem" style="flex:1;">
+          <div class="db-table-header">CLIENTE</div>
+          <ul>
+            <li><span class="badge pk">PK</span> cpf</li>
+            <li>nome</li>
+            <li class="warn">telefone <span style="font-size:9px;margin-left:2px;">⚠ multivalorado</span></li>
+            <li>rua</li>
+            <li>numero</li>
+            <li>bairro</li>
+            <li class="warn">cep <span style="font-size:9px;margin-left:2px;">⚠ dep. transitiva</span></li>
+            <li class="warn">cidade <span style="font-size:9px;margin-left:2px;">⚠ dep. transitiva</span></li>
+            <li class="warn">estado <span style="font-size:9px;margin-left:2px;">⚠ dep. transitiva</span></li>
+            <li class="warn">pais <span style="font-size:9px;margin-left:2px;">⚠ dep. transitiva</span></li>
+          </ul>
+        </div>
+        <div class="db-table problem" style="flex:1;">
+          <div class="db-table-header">EMPRESTIMO</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li><span class="badge fk">FK</span> cpf</li>
+            <li><span class="badge fk">FK</span> cod_barras</li>
+            <li>data_hora</li>
+            <li>dev_prevista</li>
+            <li>devolucao</li>
+            <li>multa</li>
+          </ul>
+        </div>
+        <div class="db-table problem" style="flex:1;">
+          <div class="db-table-header">LIVRO</div>
+          <ul>
+            <li><span class="badge pk">PK</span> cod_barras</li>
+            <li>titulo</li>
+            <li class="warn">autor <span style="font-size:9px;margin-left:2px;">⚠ tabela própria</span></li>
+            <li>isbn</li>
+            <li>edicao</li>
+            <li class="warn">editora <span style="font-size:9px;margin-left:2px;">⚠ tabela própria</span></li>
+            <li class="warn">status <span style="font-size:9px;margin-left:2px;">⚠ tabela própria</span></li>
+          </ul>
+        </div>
+      </div>
+      <div
+        style="margin-top:14px;background:rgba(255,107,107,0.06);border:1px solid rgba(255,107,107,0.2);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--muted);">
+        ⚠️ <strong style="color:var(--accent2)">Problemas:</strong> atributos multivalorados (telefone) · dependências
+        transitivas (cidade, estado, pais) · valores de domínio sem tabela própria (autor, editora, status)
+      </div>
+    </div>
+
+    <!-- ===== SLIDE 4: 1FN ===== -->
+    <div class="slide" id="slide-4">
+      <div class="slide-header">
+        <div class="slide-tag">1ª Forma Normal</div>
+        <div class="slide-num">04 / 08</div>
+      </div>
+      <h2><span class="highlight">1FN</span> — Primeira Forma Normal</h2>
+      <div class="two-col">
+        <div class="col">
+          <div class="fn-badge first">REGRA</div>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Todos os atributos devem ser
+            <strong style="color:var(--text)">atômicos</strong> (indivisíveis). Sem múltiplos valores em uma célula e
+            sem grupos repetidos.
+          </p>
+
+          <div class="problem-row">
+            <div class="label">⚠️ CLIENTE — telefone multivalorado</div>
+            <p>Um cliente pode ter vários telefones. Armazenar em um campo viola a atomicidade: <span>"(11)9999-0000,
+                (11)8888-1111"</span></p>
+          </div>
+
+          <div class="problem-row">
+            <div class="label">⚠️ LIVRO — status sem domínio controlado</div>
+            <p>Status como string livre (<span>"disponivel"</span>, <span>"Disponível"</span>) gera inconsistências e
+              erros de digitação.</p>
+          </div>
+
+          <div class="solution-note">
+            ✅
+            <strong style="color:var(--text)">Solução:</strong> tabelas separadas
+            <strong style="color:var(--text)">TELEFONE</strong> e
+            <strong style="color:var(--text)">STATUS</strong> referenciadas por FK.
+          </div>
+        </div>
+        <div class="col">
+          <div class="fn-badge first" style="margin-bottom:12px;">TABELAS GERADAS NA 1FN</div>
+
+          <div class="db-table new" style="margin-bottom:10px;">
+            <div class="db-table-header">TELEFONE <span
+                style="font-size:9px;color:var(--muted);font-weight:400;">(nova)</span></div>
+            <ul>
+              <li><span class="badge pk">PK</span><span class="badge fk">FK</span> id_cliente</li>
+              <li><span class="badge pk">PK</span> seq_telefone</li>
+              <li>telefone</li>
+            </ul>
+          </div>
+
+          <div class="db-table new" style="margin-bottom:12px;">
+            <div class="db-table-header">STATUS <span
+                style="font-size:9px;color:var(--muted);font-weight:400;">(nova)</span></div>
+            <ul>
+              <li><span class="badge pk">PK</span> id</li>
+              <li>nome</li>
+            </ul>
+          </div>
+
+          <div
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);padding:10px;border-left:2px solid var(--accent3);line-height:1.6;">
+            TELEFONE usa chave composta <strong style="color:var(--text)">(id_cliente + seq_telefone)</strong> —
+            permite N telefones por cliente sem precisar de um ID surrogate adicional.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SLIDE 5: 2FN ===== -->
+    <div class="slide" id="slide-5">
+      <div class="slide-header">
+        <div class="slide-tag">2ª Forma Normal</div>
+        <div class="slide-num">05 / 08</div>
+      </div>
+      <h2><span class="highlight">2FN</span> — Segunda Forma Normal</h2>
+      <div class="two-col">
+        <div class="col">
+          <div class="fn-badge second">REGRA</div>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Deve estar na <strong
+              style="color:var(--text)">1FN</strong> e todo atributo não-chave deve depender da <strong
+              style="color:var(--text)">chave primária completa</strong>. Proibida dependência parcial.</p>
+
+          <div
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:10px;letter-spacing:1px;">
+            ANÁLISE — CLIENTE (PK simples: cpf)</div>
+
+          <div class="dep-box">
+            <div class="dep-item key">cpf</div>
+            <div class="dep-arrow">→</div>
+            <div class="dep-item result">nome</div>
+          </div>
+
+          <div class="dep-box">
+            <div class="dep-item key">cpf</div>
+            <div class="dep-arrow">→</div>
+            <div class="dep-item bad">rua, bairro, cep, cidade, estado, pais</div>
+          </div>
+
+          <div class="problem-row" style="margin-top:6px;">
+            <div class="label">⚠️ Endereço não depende diretamente do CPF</div>
+            <p>Rua, bairro, cidade etc. pertencem a um endereço, que por sua vez depende do <span>CEP</span>. Se dois
+              clientes moram no mesmo CEP, os dados se repetem.</p>
+          </div>
+
+          <div class="solution-note">
+            ✅ <strong style="color:var(--text)">Solução:</strong> tabela <strong
+              style="color:var(--text)">ENDERECO</strong> com chave composta <strong
+              style="color:var(--text)">(cpf_cliente, seq_endereco)</strong> — permite múltiplos endereços por cliente
+            sem redundância.
+          </div>
+        </div>
+        <div class="col">
+          <div class="fn-badge second" style="margin-bottom:12px;">TABELAS APÓS 2FN</div>
+
+          <div class="db-table ok" style="margin-bottom:10px;">
+            <div class="db-table-header">CLIENTE</div>
+            <ul>
+              <li><span class="badge pk">PK</span> cpf</li>
+              <li>nome</li>
+            </ul>
+          </div>
+
+          <div class="db-table new">
+            <div class="db-table-header">ENDERECO <span
+                style="font-size:9px;color:var(--muted);font-weight:400;">(nova)</span></div>
+            <ul>
+              <li><span class="badge pk">PK</span><span class="badge fk">FK</span> cpf_cliente</li>
+              <li><span class="badge pk">PK</span> seq_endereco</li>
+              <li>cep</li>
+              <li>logradouro</li>
+              <li>numero</li>
+              <li>complemento</li>
+              <li>bairro</li>
+              <li><span class="badge fk">FK</span> id_cidade</li>
+            </ul>
+          </div>
+
+          <div
+            style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);padding:10px;border-left:2px solid var(--accent);line-height:1.6;">
+            <strong style="color:var(--text)">id_cidade</strong> referencia a tabela CIDADE — que será criada na 3FN
+            para eliminar a dependência transitiva cidade → estado → pais.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SLIDE 6: 3FN ===== -->
+    <div class="slide" id="slide-6">
+      <div class="slide-header">
+        <div class="slide-tag">3ª Forma Normal</div>
+        <div class="slide-num">06 / 08</div>
+      </div>
+      <h2><span class="highlight">3FN</span> — Terceira Forma Normal</h2>
+      <div class="two-col">
+        <div class="col">
+          <div class="fn-badge third">REGRA</div>
+          <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:14px;">Deve estar na <strong
+              style="color:var(--text)">2FN</strong> e nenhum atributo não-chave deve depender de outro atributo
+            não-chave (<strong style="color:var(--text)">sem dependência transitiva</strong>).</p>
+
+          <div
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px;">
+            DEP. TRANSITIVA — ENDEREÇO</div>
+
+          <div class="dep-box">
+            <div class="dep-item key">cpf_cliente</div>
+            <div class="dep-arrow">→</div>
+            <div class="dep-item">id_cidade</div>
+            <div class="dep-arrow">→</div>
+            <div class="dep-item bad">id_estado → id_pais</div>
+          </div>
+
+          <div class="problem-row" style="margin-bottom:10px;">
+            <div class="label">⚠️ Hierarquia geográfica encadeada</div>
+            <p><span>cidade</span> determina <span>estado</span>, e <span>estado</span> determina <span>pais</span>.
+              Guardar tudo em ENDERECO repete o nome da cidade para cada CEP daquele município.</p>
+          </div>
+
+          <div
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px;">
+            DEP. TRANSITIVA — LIVRO</div>
+
+          <div class="dep-box">
+            <div class="dep-item key">cod_barras</div>
+            <div class="dep-arrow">→</div>
+            <div class="dep-item bad">nome_autor, nome_editora</div>
+          </div>
+
+          <div class="problem-row">
+            <div class="label">⚠️ Autor e editora como texto livre</div>
+            <p>Guardar <span>"J.K. Rowling"</span> em cada livro dela repete a string. Atualizar o nome exigiria
+              alterar N registros.</p>
+          </div>
+        </div>
+        <div class="col">
+          <div class="fn-badge third" style="margin-bottom:10px;">TABELAS CRIADAS NA 3FN</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div class="db-table new" style="flex:1;">
+              <div class="db-table-header">PAIS <span
+                  style="font-size:8px;font-weight:400;color:var(--muted)">(nova)</span></div>
+              <ul>
+                <li><span class="badge pk">PK</span> id</li>
+                <li>nome</li>
+                <li>cod_pais</li>
+              </ul>
+            </div>
+            <div class="db-table new" style="flex:1;">
+              <div class="db-table-header">ESTADO <span
+                  style="font-size:8px;font-weight:400;color:var(--muted)">(nova)</span></div>
+              <ul>
+                <li><span class="badge pk">PK</span> id</li>
+                <li>nome</li>
+                <li>uf</li>
+                <li><span class="badge fk">FK</span> id_pais</li>
+              </ul>
+            </div>
+            <div class="db-table new" style="flex:1;">
+              <div class="db-table-header">CIDADE <span
+                  style="font-size:8px;font-weight:400;color:var(--muted)">(nova)</span></div>
+              <ul>
+                <li><span class="badge pk">PK</span> id</li>
+                <li>nome</li>
+                <li><span class="badge fk">FK</span> id_estado</li>
+              </ul>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div class="db-table new" style="flex:1;">
+              <div class="db-table-header">EDITORA <span
+                  style="font-size:8px;font-weight:400;color:var(--muted)">(nova)</span></div>
+              <ul>
+                <li><span class="badge pk">PK</span> id</li>
+                <li>nome</li>
+              </ul>
+            </div>
+            <div class="db-table ok" style="flex:1;">
+              <div class="db-table-header">AUTOR</div>
+              <ul>
+                <li><span class="badge pk">PK</span> id</li>
+                <li>nome</li>
+              </ul>
+            </div>
+            <div class="db-table ok" style="flex:1;">
+              <div class="db-table-header">STATUS</div>
+              <ul>
+                <li><span class="badge pk">PK</span> id</li>
+                <li>nome</li>
+              </ul>
+            </div>
+          </div>
+          <div
+            style="margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);padding:10px;border-left:2px solid var(--pk);line-height:1.6;">
+            Hierarquia <strong style="color:var(--text)">CIDADE → ESTADO → PAIS</strong> em 3 tabelas independentes.
+            Cada uma pode ser consultada, atualizada e expandida sem afetar as demais.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SLIDE 7: MODELO COMPLETO ===== -->
+    <div class="slide" id="slide-7">
+      <div class="slide-header">
+        <div class="slide-tag">Resultado Final</div>
+        <div class="slide-num">07 / 08</div>
+      </div>
+      <h2>Modelo <span class="highlight">Normalizado — 3FN</span></h2>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px;font-family:'JetBrains Mono',monospace;">11
+        tabelas · conforme DER produzido no draw.io</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+
+        <div class="db-table ok" style="min-width:118px;flex:1;">
+          <div class="db-table-header">PAIS</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li>nome</li>
+            <li>cod_pais</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:130px;flex:1;">
+          <div class="db-table-header">ESTADO</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li>nome</li>
+            <li>uf</li>
+            <li><span class="badge fk">FK</span> id_pais</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:118px;flex:1;">
+          <div class="db-table-header">CIDADE</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li>nome</li>
+            <li><span class="badge fk">FK</span> id_estado</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:158px;flex:1.3;">
+          <div class="db-table-header">ENDERECO</div>
+          <ul>
+            <li><span class="badge pk">PK</span><span class="badge fk">FK</span> cpf_cliente</li>
+            <li><span class="badge pk">PK</span> seq_endereco</li>
+            <li>cep</li>
+            <li>logradouro</li>
+            <li>numero</li>
+            <li>complemento</li>
+            <li>bairro</li>
+            <li><span class="badge fk">FK</span> id_cidade</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:110px;flex:1;">
+          <div class="db-table-header">CLIENTE</div>
+          <ul>
+            <li><span class="badge pk">PK</span> cpf</li>
+            <li>nome</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:148px;flex:1.1;">
+          <div class="db-table-header">TELEFONE</div>
+          <ul>
+            <li><span class="badge pk">PK</span><span class="badge fk">FK</span> id_cliente</li>
+            <li><span class="badge pk">PK</span> seq_telefone</li>
+            <li>telefone</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:148px;flex:1.2;">
+          <div class="db-table-header">EMPRESTIMO</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li><span class="badge fk">FK</span> id_cliente</li>
+            <li><span class="badge fk">FK</span> cod_barras</li>
+            <li>data_hora</li>
+            <li>dev_prevista</li>
+            <li>devolucao</li>
+            <li>multa</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:148px;flex:1.2;">
+          <div class="db-table-header">LIVRO</div>
+          <ul>
+            <li><span class="badge pk">PK</span> cod_barras</li>
+            <li>isbn</li>
+            <li>titulo</li>
+            <li><span class="badge fk">FK</span> id_autor</li>
+            <li><span class="badge fk">FK</span> id_editora</li>
+            <li><span class="badge fk">FK</span> id_status</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:110px;flex:1;">
+          <div class="db-table-header">AUTOR</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li>nome</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:110px;flex:1;">
+          <div class="db-table-header">EDITORA</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li>nome</li>
+          </ul>
+        </div>
+
+        <div class="db-table ok" style="min-width:110px;flex:1;">
+          <div class="db-table-header">STATUS</div>
+          <ul>
+            <li><span class="badge pk">PK</span> id</li>
+            <li>nome</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== SLIDE 8: RESUMO ===== -->
+    <div class="slide" id="slide-8">
+      <div class="slide-header">
+        <div class="slide-tag">Resumo</div>
+        <div class="slide-num">08 / 08</div>
+      </div>
+      <h2>Comparativo das <span class="highlight">Formas Normais</span></h2>
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Forma Normal</th>
+            <th>Requisito</th>
+            <th>Problema Resolvido</th>
+            <th>No nosso exemplo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag-normal tag-1fn">1FN</span></td>
+            <td>Atributos atômicos, sem grupos repetidos</td>
+            <td>Valores multivalorados em uma célula</td>
+            <td>TELEFONE com chave composta; AUTOR e STATUS em tabelas próprias</td>
+          </tr>
+          <tr>
+            <td><span class="tag-normal tag-2fn">2FN</span></td>
+            <td>1FN + dependência total na PK</td>
+            <td>Dependência parcial de atributos não-chave</td>
+            <td>ENDERECO separado com PK composta (cpf_cliente, seq_endereco) — suporta múltiplos endereços por
+              cliente</td>
+          </tr>
+          <tr>
+            <td><span class="tag-normal tag-3fn">3FN</span></td>
+            <td>2FN + sem dependência transitiva</td>
+            <td>Atributo dependendo de outro não-chave</td>
+            <td>Hierarquia CIDADE → ESTADO → PAIS em 3 tabelas; EDITORA desacoplada de LIVRO</td>
+          </tr>
+        </tbody>
+      </table>
+      <div style="display:flex;gap:12px;margin-top:auto;">
+        <div
+          style="flex:1;background:var(--surface);border:1px solid rgba(255,107,107,0.3);border-radius:8px;padding:16px;">
+          <div
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent2);letter-spacing:1px;margin-bottom:8px;">
+            ANTES</div>
+          <div style="font-size:28px;font-weight:800;margin-bottom:4px;">3 tabelas</div>
+          <div style="font-size:12px;color:var(--muted);">Redundâncias, multivalorados e dependências transitivas
+          </div>
+        </div>
+        <div
+          style="flex:1;background:var(--surface);border:1px solid rgba(79,255,176,0.3);border-radius:8px;padding:16px;">
+          <div
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent);letter-spacing:1px;margin-bottom:8px;">
+            DEPOIS</div>
+          <div style="font-size:28px;font-weight:800;margin-bottom:4px;">11 tabelas</div>
+          <div style="font-size:12px;color:var(--muted);">Dados atômicos, sem redundâncias, integridade garantida
+          </div>
+        </div>
+        <div
+          style="flex:2;background:var(--surface);border:1px solid rgba(77,166,255,0.2);border-radius:8px;padding:16px;">
+          <div
+            style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent3);letter-spacing:1px;margin-bottom:10px;">
+            DESTAQUES DO MODELO</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:12px;color:var(--muted);">🗂️ <strong style="color:var(--text)">Chaves
+                compostas:</strong> TELEFONE (id_cliente + seq_telefone) e ENDERECO (cpf_cliente + seq_endereco)</div>
+            <div style="font-size:12px;color:var(--muted);">🌍 <strong style="color:var(--text)">Hierarquia
+                geográfica:</strong> CIDADE → ESTADO → PAIS em 3 níveis independentes</div>
+            <div style="font-size:12px;color:var(--muted);">📚 <strong style="color:var(--text)">Tabelas de
+                domínio:</strong> AUTOR, EDITORA e STATUS centralizam valores válidos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end slideshow -->
+
+  <nav>
+    <button onclick="changeSlide(-1)">‹</button>
+    <div class="dots" id="dots"></div>
+    <button onclick="changeSlide(1)">›</button>
+  </nav>
+
+  <script>
+    let current = 0;
+    const slides = document.querySelectorAll('.slide');
+    const dotsContainer = document.getElementById('dots');
+
+    slides.forEach((_, i) => {
+      const d = document.createElement('div');
+      d.className = 'dot' + (i === 0 ? ' active' : '');
+      d.onclick = () => goTo(i);
+      dotsContainer.appendChild(d);
+    });
+
+    function goTo(n) {
+      slides[current].classList.remove('active');
+      dotsContainer.children[current].classList.remove('active');
+      current = (n + slides.length) % slides.length;
+      slides[current].classList.add('active');
+      dotsContainer.children[current].classList.add('active');
+    }
+
+    function changeSlide(dir) { goTo(current + dir); }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') changeSlide(1);
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') changeSlide(-1);
+    });
+  </script>
+</body>
+
+</html>
