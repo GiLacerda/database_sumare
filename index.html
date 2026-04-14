@@ -674,9 +674,7 @@
         <div class="poke-body">
             <div class="warn-box">
                 <span style="font-size:16px;flex-shrink:0">⚠</span>
-                <span>Banco de dados principal offline. Recuperei apenas anotações brutas. Normalizar URGENTE antes que
-                    os dados
-                    se percam!</span>
+                <span>Banco de dados principal offline. Recuperei apenas anotações brutas. Normalizar URGENTE antes que os dados se percam!</span>
             </div>
 
             <div class="notepad-section">
@@ -713,7 +711,7 @@
 
             <div class="entregavel">
                 <span style="font-size:16px">📋</span>
-                <span><b>Entregável:</b> Diagrama MER e DER completo.</span>
+                <span><b>Entregável:</b> Diagrama MER e DER completo construído no <a href="draw.io">Draw.io</a> e exportado como png.</span>
                 <span><b>Como entregar:</b> Chame a professora que ela irá guardar os arquivos no pen drive.</span>
             </div>
             <br/><br/><br/><br/>
@@ -869,16 +867,19 @@
     }
 
     function onItemClick(id) {
+        // Se o item estiver bloqueado (locked), não faz nada
         if (!isItemUnlocked(id)) return;
-        if (checked[id]) return;
-        checked[id] = true;
+
+        // Inverte o estado (se era true vira false, se era false vira true)
+        checked[id] = !checked[id];
 
         const catIdx = CATEGORIES.findIndex(c => c.items.some(it => it.id === id));
         const cat = CATEGORIES[catIdx];
 
         renderUI();
 
-        if (allItemsInCat(cat)) {
+        // Só mostra o popup se o item foi MARCADO e a categoria foi completada
+        if (checked[id] && allItemsInCat(cat)) {
             setTimeout(() => showPopup(cat.trophy), 350);
         }
     }
